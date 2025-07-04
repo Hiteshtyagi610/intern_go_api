@@ -1,51 +1,53 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
+from pydantic import BaseModel
 import os
 import google.generativeai as genai
 
-load_dotenv()
-
-# Configure Gemini
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-
 app = FastAPI()
 
-# Allow Flutter frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Replace * with your frontend domain in production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Request Model
-class CoverLetterRequest(BaseModel):
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+model = genai.GenerativeModel("gemini-pro")
+
+class ChatRequest(BaseModel):
     name: str
-    skills: list[str]
-    locationPref: list[str]
+    skills: list
+    education: str
+    experience: str
     jobDescription: str
 
-@app.post("/api/generate-cover-letter")
-async def generate_cover_letter(data: CoverLetterRequest):
-    model = genai.GenerativeModel('gemini-pro')
-
+@app.post("/chat")
+def chat(req: ChatRequest):
     prompt = f"""
-Write a personalized, enthusiastic cover letter starting with 'Dear Hiring Manager' based on:
-Name: {data.name}
-Skills: {', '.join(data.skills)}
-Preferred Location: {', '.join(data.locationPref)}
-Job Description: {data.jobDescription}
+You are an AI assistant helping {req.name} apply for jobs. Based on this job description:
 
-Make it professional, role-specific, ATS-friendly, and ~250 words max.
+{req.jobDescription}
+
+Generate a tailored **resume** (based on:
+Skills: {', '.join(req.skills)}
+Education: {req.education}
+Experience: {req.experience}
+) and a **cover letter**.
+
+Reply in this format:
+---
+**Resume**
+<resume content>
+
+---
+**Cover Letter**
+<cover letter content>
 """
-
-    response = model.generate_content(prompt)
-    return { "coverLetter": response.text.strip() }
-
-@app.get("/")
-def root():
-    return {"message": "Gemini Cover Letter Generator is running ✅"}
-
+    try:
+        response = model.generate_content(prompt)
+        return {"response": response.text}
+    except Exception as e:
+        return {"response": f"Error: {str(e)}"}
