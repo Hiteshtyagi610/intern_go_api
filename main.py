@@ -44,3 +44,8 @@ Make it professional, role-specific, ATS-friendly, and ~250 words max.
 
     response = model.generate_content(prompt)
     return { "coverLetter": response.text.strip() }
+
+@app.get("/")
+def root():
+    return {"message": "Gemini Cover Letter Generator is running ✅"}
+
